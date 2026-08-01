@@ -138,9 +138,10 @@
   <!-- 开始 / 胜利 / 失败 覆盖层 -->
   <div class="overlay" id="startScreen">
     <h1>🐦 愤怒的小鸟</h1>
-    <p>拖动弹弓上的小鸟向后拉，松手发射！<br>
-       黄色小鸟点按可冲刺加速，蓝色小鸟点按可分身成 3 只。<br>
-       摧毁所有绿色小猪即可过关。</p>
+    <p>拖动弹弓上的小鸟向后拉，松手发射！共有 6 种小鸟：<br>
+       🔴红(普通) 🟡黄(冲刺) 🔵蓝(分身) ⚫黑(爆炸) ⚪白(下蛋) 🟢绿(回旋)<br>
+       飞行中按 R 键 / 右键触发技能。<br>
+       猪会戴头盔减伤，倾斜建筑让它倒塌砸猪！</p>
     <button class="btn big" id="startBtn">▶ 开始游戏</button>
   </div>
   <div class="overlay hidden" id="winScreen">
@@ -175,46 +176,68 @@ const TAU = Math.PI * 2;
 /* ---------------- 静态结构与关卡配置 ---------------- */
 // 每种材质块的「抗破坏力度」：碰撞速度超过该值即被砸碎
 const BREAK_FORCE = { wood: 5.5, stone: 9 };
-const PIG_HP = 25;                   // 小猪血量（撞击伤害 = 撞击速度）
+const PIG_HP_BASE = 22;              // 小猪基础血量
 
-// LEVELS：每个关卡定义小猪与积木块的摆放
+/* ---------- 小鸟种类 ----------
+ * 红: 普通 (圆形炮弹)
+ * 黄: 冲刺 (空中加速)
+ * 蓝: 分身 (1裂3)
+ * 黑: 爆炸 (触地/撞猪后引爆，炸飞周围物体)
+ * 白: 下蛋 (飞行中向下方丢一个炸弹蛋)
+ * 绿: 回旋镖 (飞出后可按R折返反向冲击)
+ */
+const BIRD_COLORS = ['red', 'yellow', 'blue', 'black', 'white', 'green'];
+const BIRD_ABILITY = { red:'none', yellow:'boost', blue:'split', black:'bomb', white:'egg', green:'boomerang' };
+const BIRD_COLOR_HEX = { red:'#e5301f', yellow:'#ffc21a', blue:'#3f9bff', black:'#3a3028', white:'#f5f5f0', green:'#4dbb2e' };
+const BIRD_ABILITY_NAME = { none:'普通', boost:'冲刺加速', split:'一分为三', bomb:'爆炸冲击', egg:'空投炸弹', boomerang:'回旋折返' };
+
+/* ---------- 猪的种类 ----------
+ * normal:  普通绿猪    血量 22
+ * helmet:  木盔绿猪    血量 30，头部减伤 40%
+ * armored: 铁盔猪     血量 40，头部减伤 70%
+ */
+const PIG_TYPE_HP      = { normal:22, helmet:30, armored:40 };
+const PIG_TYPE_HELMET  = { normal:0,  helmet:0.4, armored:0.7 };
+
+// LEVELS：20关，难度递增
+// 建筑区域 x 范围: 580 ~ 940，地面 y = GROUND_Y = 560
 const LEVELS = [
+  // ===== 第 1~5 关：入门 =====
   {
-    name: '第 1 关', birds: 3, bg: 0,
-    pigs:  [
-      { x: 710, y: 552 }, { x: 810, y: 552 },
+    name: '第 1 关 · 初出茅庐', birds: ['red','red','yellow'], bg: 0,
+    pigs: [
+      { x: 710, y: 552, type:'normal' }, { x: 810, y: 552, type:'normal' },
     ],
     blocks: [
-      { x: 760, y: 526, w: 120, h: 14, mat: 'wood' },   // 横梁
-      { x: 702, y: 454, w: 14,  h: 148, mat: 'wood' },  // 左立柱
-      { x: 818, y: 454, w: 14,  h: 148, mat: 'wood' },  // 右立柱
-      { x: 760, y: 396, w: 150, h: 16, mat: 'wood' },   // 第二层平台
+      { x: 760, y: 526, w: 120, h: 14, mat: 'wood' },
+      { x: 702, y: 454, w: 14,  h: 148, mat: 'wood' },
+      { x: 818, y: 454, w: 14,  h: 148, mat: 'wood' },
+      { x: 760, y: 396, w: 150, h: 16, mat: 'wood' },
     ],
   },
   {
-    name: '第 2 关', birds: 4, bg: 0,
+    name: '第 2 关 · 小试牛刀', birds: ['red','yellow','blue'], bg: 0,
     pigs: [
-      { x: 698, y: 552 }, { x: 786, y: 494 }, { x: 880, y: 552 },
+      { x: 688, y: 552, type:'normal' }, { x: 786, y: 494, type:'normal' }, { x: 890, y: 552, type:'normal' },
     ],
     blocks: [
-      { x: 786, y: 470, w: 90,  h: 14,  mat: 'wood' },   // 平台
-      { x: 750, y: 400, w: 12,  h: 126, mat: 'wood' },   // 立柱
+      { x: 786, y: 470, w: 90,  h: 14,  mat: 'wood' },
+      { x: 750, y: 400, w: 12,  h: 126, mat: 'wood' },
       { x: 822, y: 400, w: 12,  h: 126, mat: 'wood' },
-      { x: 700, y: 454, w: 14,  h: 212, mat: 'wood' },
-      { x: 880, y: 540, w: 60,  h: 16,  mat: 'stone' },  // 石头掩体
+      { x: 690, y: 454, w: 14,  h: 212, mat: 'wood' },
+      { x: 890, y: 530, w: 60,  h: 14,  mat: 'stone' },
     ],
   },
   {
-    name: '第 3 关', birds: 4, bg: 1,
+    name: '第 3 关 · 石头堡垒', birds: ['red','blue','yellow','white'], bg: 0,
     pigs: [
-      { x: 700, y: 552 }, { x: 800, y: 552 }, { x: 900, y: 552 },
-      { x: 806, y: 494 },
+      { x: 700, y: 552, type:'normal' }, { x: 800, y: 552, type:'helmet' }, { x: 806, y: 494, type:'normal' },
     ],
     blocks: [
-      { x: 806, y: 470, w: 120, h: 14, mat: 'stone' },   // 石头平台
-      { x: 752, y: 400, w: 14,  h: 126, mat: 'stone' },  // 石柱
+      { x: 806, y: 470, w: 120, h: 14, mat: 'stone' },
+      { x: 752, y: 400, w: 14,  h: 126, mat: 'stone' },
       { x: 860, y: 400, w: 14,  h: 126, mat: 'stone' },
-      { x: 806, y: 340, w: 130, h: 14, mat: 'wood' },    // 顶部木平台
+      { x: 806, y: 340, w: 130, h: 14, mat: 'wood' },
       { x: 770, y: 262, w: 12,  h: 140, mat: 'wood' },
       { x: 842, y: 262, w: 12,  h: 140, mat: 'wood' },
       { x: 700, y: 520, w: 70,  h: 12,  mat: 'wood' },
@@ -222,10 +245,11 @@ const LEVELS = [
     ],
   },
   {
-    name: '第 4 关', birds: 4, bg: 1,
+    name: '第 4 关 · 铁甲初现', birds: ['red','yellow','blue','black','white'], bg: 1,
     pigs: [
-      { x: 680, y: 552 }, { x: 770, y: 494 }, { x: 850, y: 552 },
-      { x: 850, y: 390 }, { x: 920, y: 552 },
+      { x: 680, y: 552, type:'helmet' }, { x: 770, y: 494, type:'armored' },
+      { x: 850, y: 552, type:'normal' },  { x: 850, y: 390, type:'helmet' },
+      { x: 920, y: 552, type:'normal' },
     ],
     blocks: [
       { x: 770, y: 470, w: 110, h: 14, mat: 'stone' },
@@ -239,10 +263,11 @@ const LEVELS = [
     ],
   },
   {
-    name: '第 5 关', birds: 5, bg: 2,
+    name: '第 5 关 · 要塞攻坚', birds: ['red','yellow','blue','green','white','black'], bg: 2,
     pigs: [
-      { x: 670, y: 552 }, { x: 760, y: 494 }, { x: 840, y: 552 },
-      { x: 840, y: 390 }, { x: 920, y: 552 }, { x: 800, y: 240 },
+      { x: 670, y: 552, type:'helmet' }, { x: 760, y: 494, type:'armored' },
+      { x: 840, y: 552, type:'helmet' },  { x: 840, y: 390, type:'armored' },
+      { x: 920, y: 552, type:'helmet' },   { x: 800, y: 240, type:'normal' },
     ],
     blocks: [
       { x: 760, y: 470, w: 120, h: 14, mat: 'stone' },
@@ -256,12 +281,345 @@ const LEVELS = [
       { x: 920, y: 520, w: 70,  h: 14,  mat: 'stone' },
     ],
   },
+
+  // ===== 第 6~10 关：进阶 =====
+  {
+    name: '第 6 关 · 双塔奇兵', birds: ['red','blue','yellow','black','white'], bg: 0,
+    pigs: [
+      { x: 650, y: 552, type:'helmet' }, { x: 750, y: 552, type:'normal' },
+      { x: 870, y: 552, type:'helmet' }, { x: 820, y: 460, type:'normal' },
+    ],
+    blocks: [
+      { x: 700, y: 470, w: 14,  h: 180, mat: 'stone' },
+      { x: 650, y: 400, w: 80,  h: 14,  mat: 'wood' },
+      { x: 820, y: 436, w: 80,  h: 14,  mat: 'wood' },
+      { x: 780, y: 370, w: 12,  h: 120, mat: 'stone' },
+      { x: 870, y: 470, w: 14,  h: 180, mat: 'stone' },
+      { x: 870, y: 400, w: 80,  h: 14,  mat: 'wood' },
+      { x: 650, y: 526, w: 60,  h: 12,  mat: 'wood' },
+      { x: 870, y: 526, w: 60,  h: 12,  mat: 'wood' },
+    ],
+  },
+  {
+    name: '第 7 关 · 钢铁城墙', birds: ['red','yellow','black','blue','white','green'], bg: 1,
+    pigs: [
+      { x: 690, y: 552, type:'helmet' }, { x: 790, y: 540, type:'armored' },
+      { x: 880, y: 552, type:'armored' }, { x: 790, y: 420, type:'helmet' },
+    ],
+    blocks: [
+      { x: 730, y: 470, w: 12,  h: 180, mat: 'stone' },
+      { x: 850, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 790, y: 396, w: 130, h: 14, mat: 'stone' },
+      { x: 730, y: 340, w: 80,  h: 12,  mat: 'stone' },
+      { x: 850, y: 330, w: 80,  h: 12,  mat: 'stone' },
+      { x: 790, y: 280, w: 120, h: 12,  mat: 'wood' },
+      { x: 690, y: 520, w: 60,  h: 10,  mat: 'wood' },
+      { x: 880, y: 520, w: 60,  h: 10,  mat: 'wood' },
+    ],
+  },
+  {
+    name: '第 8 关 · 空中楼阁', birds: ['red','yellow','blue','white','black'], bg: 2,
+    pigs: [
+      { x: 670, y: 552, type:'normal' }, { x: 760, y: 494, type:'armored' },
+      { x: 840, y: 552, type:'helmet' }, { x: 760, y: 340, type:'helmet' },
+      { x: 900, y: 350, type:'normal' },
+    ],
+    blocks: [
+      { x: 760, y: 470, w: 90,  h: 14,  mat: 'stone' },
+      { x: 720, y: 406, w: 12,  h: 120, mat: 'stone' },
+      { x: 800, y: 406, w: 12,  h: 120, mat: 'stone' },
+      { x: 760, y: 316, w: 90,  h: 14,  mat: 'wood' },
+      { x: 720, y: 260, w: 10,  h: 100, mat: 'wood' },
+      { x: 800, y: 260, w: 10,  h: 100, mat: 'wood' },
+      { x: 900, y: 318, w: 60,  h: 14,  mat: 'stone' },
+      { x: 880, y: 260, w: 10,  h: 100, mat: 'stone' },
+      { x: 920, y: 260, w: 10,  h: 100, mat: 'stone' },
+      { x: 670, y: 520, w: 60,  h: 10,  mat: 'wood' },
+    ],
+  },
+  {
+    name: '第 9 关 · 堡垒之夜', birds: ['red','blue','black','yellow','green','white'], bg: 1,
+    pigs: [
+      { x: 650, y: 552, type:'armored' }, { x: 750, y: 494, type:'helmet' },
+      { x: 830, y: 552, type:'armored' }, { x: 900, y: 400, type:'helmet' },
+      { x: 750, y: 340, type:'normal' },
+    ],
+    blocks: [
+      { x: 700, y: 470, w: 12,  h: 180, mat: 'stone' },
+      { x: 800, y: 470, w: 12,  h: 180, mat: 'stone' },
+      { x: 750, y: 396, w: 110, h: 14,  mat: 'stone' },
+      { x: 700, y: 340, w: 70,  h: 12,  mat: 'stone' },
+      { x: 800, y: 340, w: 70,  h: 12,  mat: 'stone' },
+      { x: 900, y: 374, w: 60,  h: 14,  mat: 'wood' },
+      { x: 880, y: 316, w: 10,  h: 100, mat: 'stone' },
+      { x: 920, y: 316, w: 10,  h: 100, mat: 'stone' },
+      { x: 650, y: 520, w: 50,  h: 12,  mat: 'stone' },
+      { x: 830, y: 520, w: 50,  h: 12,  mat: 'stone' },
+    ],
+  },
+  {
+    name: '第 10 关 · 终极试炼', birds: ['red','yellow','blue','black','white','green'], bg: 2,
+    pigs: [
+      { x: 640, y: 552, type:'armored' }, { x: 740, y: 494, type:'armored' },
+      { x: 830, y: 552, type:'helmet' },   { x: 900, y: 552, type:'armored' },
+      { x: 830, y: 390, type:'armored' },   { x: 830, y: 260, type:'helmet' },
+    ],
+    blocks: [
+      { x: 690, y: 470, w: 12,  h: 180, mat: 'stone' },
+      { x: 780, y: 470, w: 12,  h: 180, mat: 'stone' },
+      { x: 870, y: 470, w: 12,  h: 180, mat: 'stone' },
+      { x: 830, y: 366, w: 150, h: 14,  mat: 'stone' },
+      { x: 780, y: 310, w: 10,  h: 100, mat: 'stone' },
+      { x: 880, y: 310, w: 10,  h: 100, mat: 'stone' },
+      { x: 830, y: 236, w: 110, h: 14,  mat: 'wood' },
+      { x: 780, y: 184, w: 10,  h: 90,  mat: 'wood' },
+      { x: 880, y: 184, w: 10,  h: 90,  mat: 'wood' },
+      { x: 640, y: 520, w: 50,  h: 12,  mat: 'stone' },
+      { x: 900, y: 520, w: 50,  h: 12,  mat: 'stone' },
+    ],
+  },
+
+  // ===== 第 11~15 关：挑战 =====
+  {
+    name: '第 11 关 · 迷宫石阵', birds: ['red','yellow','blue','black','white','green'], bg: 0,
+    pigs: [
+      { x: 620, y: 552, type:'helmet' }, { x: 720, y: 552, type:'armored' },
+      { x: 820, y: 460, type:'armored' }, { x: 920, y: 552, type:'helmet' },
+      { x: 820, y: 340, type:'normal' },
+    ],
+    blocks: [
+      { x: 670, y: 480, w: 12,  h: 170, mat: 'stone' },
+      { x: 770, y: 480, w: 12,  h: 170, mat: 'stone' },
+      { x: 870, y: 480, w: 12,  h: 170, mat: 'stone' },
+      { x: 720, y: 420, w: 100, h: 12,  mat: 'stone' },
+      { x: 820, y: 436, w: 100, h: 12,  mat: 'stone' },
+      { x: 720, y: 366, w: 80,  h: 10,  mat: 'wood' },
+      { x: 920, y: 370, w: 70,  h: 12,  mat: 'wood' },
+      { x: 820, y: 316, w: 90,  h: 12,  mat: 'wood' },
+      { x: 780, y: 264, w: 10,  h: 90,  mat: 'stone' },
+      { x: 880, y: 264, w: 10,  h: 90,  mat: 'stone' },
+      { x: 620, y: 520, w: 50,  h: 12,  mat: 'wood' },
+      { x: 920, y: 520, w: 50,  h: 12,  mat: 'wood' },
+    ],
+  },
+  {
+    name: '第 12 关 · 悬崖之上', birds: ['red','blue','black','yellow','green','white'], bg: 1,
+    pigs: [
+      { x: 630, y: 552, type:'armored' }, { x: 730, y: 494, type:'armored' },
+      { x: 830, y: 552, type:'armored' }, { x: 830, y: 390, type:'helmet' },
+      { x: 910, y: 494, type:'helmet' },
+    ],
+    blocks: [
+      { x: 680, y: 470, w: 12,  h: 180, mat: 'stone' },
+      { x: 780, y: 470, w: 12,  h: 180, mat: 'stone' },
+      { x: 880, y: 470, w: 12,  h: 180, mat: 'stone' },
+      { x: 730, y: 396, w: 110, h: 14,  mat: 'stone' },
+      { x: 830, y: 366, w: 110, h: 14,  mat: 'stone' },
+      { x: 730, y: 336, w: 80,  h: 10,  mat: 'stone' },
+      { x: 910, y: 340, w: 60,  h: 12,  mat: 'wood' },
+      { x: 830, y: 284, w: 80,  h: 10,  mat: 'wood' },
+      { x: 800, y: 230, w: 10,  h: 90,  mat: 'stone' },
+      { x: 880, y: 230, w: 10,  h: 90,  mat: 'stone' },
+      { x: 630, y: 520, w: 50,  h: 12,  mat: 'stone' },
+      { x: 910, y: 520, w: 60,  h: 12,  mat: 'wood' },
+    ],
+  },
+  {
+    name: '第 13 关 · 铁壁合围', birds: ['red','yellow','black','blue','white','green'], bg: 2,
+    pigs: [
+      { x: 620, y: 552, type:'armored' }, { x: 720, y: 494, type:'armored' },
+      { x: 820, y: 552, type:'armored' }, { x: 820, y: 390, type:'armored' },
+      { x: 920, y: 552, type:'armored' }, { x: 770, y: 260, type:'helmet' },
+    ],
+    blocks: [
+      { x: 660, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 770, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 870, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 715, y: 396, w: 120, h: 14,  mat: 'stone' },
+      { x: 820, y: 366, w: 120, h: 14,  mat: 'stone' },
+      { x: 920, y: 336, w: 60,  h: 12,  mat: 'stone' },
+      { x: 770, y: 236, w: 90,  h: 14,  mat: 'stone' },
+      { x: 730, y: 186, w: 10,  h: 85,  mat: 'stone' },
+      { x: 810, y: 186, w: 10,  h: 85,  mat: 'stone' },
+      { x: 620, y: 520, w: 50,  h: 14,  mat: 'stone' },
+      { x: 920, y: 520, w: 50,  h: 14,  mat: 'stone' },
+    ],
+  },
+  {
+    name: '第 14 关 · 天上人间', birds: ['red','blue','black','yellow','green','white'], bg: 0,
+    pigs: [
+      { x: 640, y: 552, type:'armored' }, { x: 740, y: 460, type:'armored' },
+      { x: 840, y: 552, type:'armored' }, { x: 910, y: 390, type:'armored' },
+      { x: 740, y: 280, type:'helmet' },   { x: 840, y: 220, type:'normal' },
+    ],
+    blocks: [
+      { x: 690, y: 480, w: 12,  h: 170, mat: 'stone' },
+      { x: 790, y: 480, w: 12,  h: 170, mat: 'stone' },
+      { x: 890, y: 480, w: 12,  h: 170, mat: 'stone' },
+      { x: 740, y: 436, w: 110, h: 14,  mat: 'stone' },
+      { x: 840, y: 396, w: 80,  h: 12,  mat: 'stone' },
+      { x: 910, y: 366, w: 60,  h: 12,  mat: 'stone' },
+      { x: 700, y: 316, w: 80,  h: 10,  mat: 'wood' },
+      { x: 780, y: 260, w: 10,  h: 110, mat: 'stone' },
+      { x: 840, y: 196, w: 80,  h: 12,  mat: 'wood' },
+      { x: 810, y: 146, w: 10,  h: 85,  mat: 'wood' },
+      { x: 640, y: 520, w: 60,  h: 12,  mat: 'wood' },
+    ],
+  },
+  {
+    name: '第 15 关 · 暴风前夕', birds: ['red','yellow','blue','black','white','green'], bg: 1,
+    pigs: [
+      { x: 610, y: 552, type:'armored' }, { x: 710, y: 494, type:'armored' },
+      { x: 810, y: 552, type:'armored' }, { x: 890, y: 552, type:'armored' },
+      { x: 810, y: 370, type:'armored' }, { x: 760, y: 240, type:'helmet' },
+      { x: 890, y: 350, type:'helmet' },
+    ],
+    blocks: [
+      { x: 660, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 760, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 860, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 710, y: 396, w: 110, h: 14,  mat: 'stone' },
+      { x: 810, y: 346, w: 110, h: 14,  mat: 'stone' },
+      { x: 890, y: 326, w: 70,  h: 12,  mat: 'stone' },
+      { x: 710, y: 286, w: 80,  h: 10,  mat: 'stone' },
+      { x: 890, y: 260, w: 10,  h: 120, mat: 'wood' },
+      { x: 810, y: 236, w: 80,  h: 12,  mat: 'wood' },
+      { x: 610, y: 520, w: 50,  h: 12,  mat: 'stone' },
+      { x: 890, y: 520, w: 50,  h: 12,  mat: 'stone' },
+    ],
+  },
+
+  // ===== 第 16~20 关：地狱难度 =====
+  {
+    name: '第 16 关 · 钢铁森林', birds: ['red','yellow','blue','black','white','green'], bg: 2,
+    pigs: [
+      { x: 600, y: 552, type:'armored' }, { x: 700, y: 494, type:'armored' },
+      { x: 800, y: 552, type:'armored' }, { x: 890, y: 552, type:'armored' },
+      { x: 800, y: 370, type:'armored' }, { x: 700, y: 280, type:'armored' },
+      { x: 890, y: 280, type:'helmet' },
+    ],
+    blocks: [
+      { x: 650, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 750, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 850, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 700, y: 396, w: 110, h: 14,  mat: 'stone' },
+      { x: 800, y: 346, w: 200, h: 14,  mat: 'stone' },
+      { x: 700, y: 256, w: 80,  h: 12,  mat: 'stone' },
+      { x: 800, y: 256, w: 80,  h: 12,  mat: 'stone' },
+      { x: 890, y: 256, w: 70,  h: 12,  mat: 'wood' },
+      { x: 700, y: 196, w: 10,  h: 100, mat: 'stone' },
+      { x: 800, y: 196, w: 10,  h: 100, mat: 'stone' },
+      { x: 750, y: 146, w: 70,  h: 10,  mat: 'wood' },
+      { x: 600, y: 520, w: 50,  h: 12,  mat: 'stone' },
+      { x: 890, y: 520, w: 50,  h: 12,  mat: 'stone' },
+    ],
+  },
+  {
+    name: '第 17 关 · 绝境长城', birds: ['red','yellow','blue','black','white','green'], bg: 0,
+    pigs: [
+      { x: 610, y: 552, type:'armored' }, { x: 710, y: 494, type:'armored' },
+      { x: 810, y: 552, type:'armored' }, { x: 910, y: 552, type:'armored' },
+      { x: 710, y: 340, type:'armored' }, { x: 860, y: 390, type:'armored' },
+      { x: 810, y: 240, type:'helmet' },
+    ],
+    blocks: [
+      { x: 660, y: 470, w: 12,  h: 190, mat: 'stone' },
+      { x: 760, y: 470, w: 12,  h: 190, mat: 'stone' },
+      { x: 860, y: 470, w: 12,  h: 190, mat: 'stone' },
+      { x: 710, y: 396, w: 110, h: 14,  mat: 'stone' },
+      { x: 810, y: 370, w: 200, h: 14,  mat: 'stone' },
+      { x: 660, y: 316, w: 80,  h: 12,  mat: 'stone' },
+      { x: 910, y: 346, w: 60,  h: 12,  mat: 'stone' },
+      { x: 710, y: 256, w: 80,  h: 12,  mat: 'stone' },
+      { x: 910, y: 256, w: 60,  h: 12,  mat: 'wood' },
+      { x: 810, y: 216, w: 90,  h: 14,  mat: 'stone' },
+      { x: 760, y: 170, w: 10,  h: 80,  mat: 'stone' },
+      { x: 860, y: 170, w: 10,  h: 80,  mat: 'stone' },
+      { x: 610, y: 520, w: 50,  h: 12,  mat: 'stone' },
+      { x: 910, y: 520, w: 50,  h: 12,  mat: 'stone' },
+    ],
+  },
+  {
+    name: '第 18 关 · 众神黄昏', birds: ['red','yellow','blue','black','white','green'], bg: 1,
+    pigs: [
+      { x: 590, y: 552, type:'armored' }, { x: 690, y: 494, type:'armored' },
+      { x: 790, y: 552, type:'armored' }, { x: 890, y: 552, type:'armored' },
+      { x: 690, y: 320, type:'armored' }, { x: 840, y: 380, type:'armored' },
+      { x: 790, y: 240, type:'armored' }, { x: 890, y: 240, type:'helmet' },
+    ],
+    blocks: [
+      { x: 640, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 740, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 840, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 690, y: 396, w: 110, h: 14,  mat: 'stone' },
+      { x: 790, y: 396, w: 90,  h: 14,  mat: 'stone' },
+      { x: 890, y: 370, w: 100, h: 14,  mat: 'stone' },
+      { x: 640, y: 316, w: 80,  h: 12,  mat: 'stone' },
+      { x: 840, y: 296, w: 80,  h: 12,  mat: 'stone' },
+      { x: 840, y: 216, w: 80,  h: 12,  mat: 'wood' },
+      { x: 790, y: 186, w: 10,  h: 70,  mat: 'stone' },
+      { x: 890, y: 186, w: 10,  h: 70,  mat: 'stone' },
+      { x: 590, y: 520, w: 50,  h: 14,  mat: 'stone' },
+      { x: 890, y: 520, w: 50,  h: 14,  mat: 'stone' },
+    ],
+  },
+  {
+    name: '第 19 关 · 地狱之门', birds: ['red','yellow','blue','black','white','green'], bg: 2,
+    pigs: [
+      { x: 590, y: 552, type:'armored' }, { x: 690, y: 494, type:'armored' },
+      { x: 790, y: 552, type:'armored' }, { x: 890, y: 552, type:'armored' },
+      { x: 740, y: 320, type:'armored' }, { x: 840, y: 360, type:'armored' },
+      { x: 690, y: 230, type:'armored' }, { x: 840, y: 200, type:'helmet' },
+    ],
+    blocks: [
+      { x: 640, y: 470, w: 12,  h: 190, mat: 'stone' },
+      { x: 740, y: 470, w: 12,  h: 190, mat: 'stone' },
+      { x: 840, y: 470, w: 12,  h: 190, mat: 'stone' },
+      { x: 690, y: 396, w: 110, h: 14,  mat: 'stone' },
+      { x: 790, y: 396, w: 90,  h: 14,  mat: 'stone' },
+      { x: 890, y: 380, w: 70,  h: 12,  mat: 'stone' },
+      { x: 740, y: 296, w: 110, h: 12,  mat: 'stone' },
+      { x: 840, y: 296, w: 60,  h: 12,  mat: 'stone' },
+      { x: 640, y: 260, w: 70,  h: 10,  mat: 'stone' },
+      { x: 840, y: 176, w: 80,  h: 12,  mat: 'wood' },
+      { x: 800, y: 130, w: 10,  h: 70,  mat: 'wood' },
+      { x: 590, y: 520, w: 50,  h: 14,  mat: 'stone' },
+      { x: 890, y: 520, w: 50,  h: 14,  mat: 'stone' },
+    ],
+  },
+  {
+    name: '第 20 关 · 终局之战', birds: ['red','yellow','blue','black','white','green'], bg: 1,
+    pigs: [
+      { x: 580, y: 552, type:'armored' }, { x: 680, y: 494, type:'armored' },
+      { x: 780, y: 552, type:'armored' }, { x: 880, y: 552, type:'armored' },
+      { x: 730, y: 340, type:'armored' }, { x: 830, y: 370, type:'armored' },
+      { x: 630, y: 270, type:'armored' }, { x: 780, y: 220, type:'armored' },
+      { x: 880, y: 260, type:'armored' },
+    ],
+    blocks: [
+      { x: 630, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 730, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 830, y: 460, w: 12,  h: 200, mat: 'stone' },
+      { x: 680, y: 396, w: 110, h: 14,  mat: 'stone' },
+      { x: 780, y: 396, w: 90,  h: 14,  mat: 'stone' },
+      { x: 880, y: 396, w: 80,  h: 14,  mat: 'stone' },
+      { x: 730, y: 316, w: 200, h: 12,  mat: 'stone' },
+      { x: 630, y: 246, w: 60,  h: 12,  mat: 'stone' },
+      { x: 830, y: 246, w: 80,  h: 12,  mat: 'stone' },
+      { x: 880, y: 236, w: 60,  h: 12,  mat: 'wood' },
+      { x: 730, y: 196, w: 90,  h: 12,  mat: 'wood' },
+      { x: 780, y: 146, w: 10,  h: 80,  mat: 'wood' },
+      { x: 580, y: 520, w: 50,  h: 14,  mat: 'stone' },
+      { x: 880, y: 520, w: 60,  h: 14,  mat: 'stone' },
+    ],
+  },
 ];
 
 const BG_COLORS = [
   { top: '#5ec1ff', bot: '#cdeaff' },   // 0 晴空
   { top: '#ffb45e', bot: '#ffdcb0' },   // 1 黄昏
   { top: '#8fd3a8', bot: '#e8f8e0' },   // 2 清新绿
+  { top: '#7b68c0', bot: '#c4b8f0' },   // 3 紫夜
 ];
 
 /* ---------------- 画布与 DOM ---------------- */
@@ -360,26 +718,29 @@ function createGame() {
   const g = {
     level: 1,
     score: 0,
-    birdsTotal: LEVELS[0].birds,
-    birdsUsed: 0,          // 已消耗小鸟数
-    pigsAlive: 0,          // 存活小猪数（用于判定过关）
+    birdQueue: [],       // 本关小鸟队列（字符串数组）
+    birdsTotal: 0,
+    birdIndex: 0,        // 队列索引（替代 birdsUsed）
+    pigsAlive: 0,
     pigsTotal: 0,
-    state: 'idle',         // idle | ready | drag | flying
-    bird: null,            // 当前主小鸟（body）
-    fragments: [],         // 蓝色小鸟分身
-    inSlingshot: true,     // 小鸟是否还在弹弓上（绘制皮筋用）
-    turnTimer: 0,          // 回合结束倒计时（>0 时推进）
-    endTimer: 0,           // 胜负判定倒计时
-    ended: false,          // 是否已结束（胜利/失败）
+    state: 'idle',
+    bird: null,
+    fragments: [],
+    inSlingshot: true,
+    turnTimer: 0,
+    endTimer: 0,
+    ended: false,
     hintShown: false,
     first: true,
     particles: [],
     popups: [],
     trail: [],
-    abilities: {},         // bird.id -> 'none'|'boost'|'split'
-    trailOn: {},           // bird.id -> bool（是否绘制拖尾）
-    flash: {},             // body.id -> 受击白闪计时
-    removing: {},          // body.id -> 已标记销毁
+    abilities: {},
+    trailOn: {},
+    flash: {},
+    removing: {},
+    bombPlaced: false,   // 黑鸟/白蛋是否已放置爆炸物
+    boomerangUsed: false,// 绿鸟是否已折返
   };
   return g;
 }
@@ -394,7 +755,9 @@ function setupLevel(levelIdx) {
   G = createGame();
   G.level = levelIdx;
   const cfg = LEVELS[levelIdx - 1];
-  G.birdsTotal = cfg.birds;
+  G.birdQueue = cfg.birds.slice();  // 复制小鸟队列
+  G.birdsTotal = cfg.birds.length;
+  G.birdIndex = 0;
 
   // 地面 + 左右墙
   World.add(world, [
@@ -407,11 +770,15 @@ function setupLevel(levelIdx) {
   G.pigsTotal = cfg.pigs.length;
   G.pigsAlive = cfg.pigs.length;
   for (const p of cfg.pigs) {
+    const pt = p.type || 'normal';
     const b = Bodies.circle(p.x, p.y, 17, MAT_CONF.pig);
     b.plugin = b.plugin || {};
     b.plugin.kind = 'pig';
-    b.plugin.hp = PIG_HP;
+    b.plugin.pigType = pt;
+    b.plugin.hp = PIG_TYPE_HP[pt];
+    b.plugin.helmet = PIG_TYPE_HELMET[pt];  // 头部减伤比例
     b.plugin.flashT = 0;
+    b.plugin.helmetFlashT = 0;              // 头盔受击闪
     World.add(world, b);
   }
 
@@ -436,21 +803,23 @@ function setupLevel(levelIdx) {
   showBanner(`第 ${levelIdx} 关`);
   cam.shake = 0; cam.x = 0;
   if (!G.hintShown) {
-    hintEl.textContent = isTouch() ? '按住小鸟向后拖，松手发射' : '按住小鸟向后拖，松手发射（技能：R 键 / 右键）';
+    hintEl.textContent = isTouch() ? '按住小鸟向后拖，松手发射' : '按住小鸟向后拖发射（R键/右键：技能）';
   }
   abilityBtn.style.display = 'none';
 }
 
 /* 装填下一只小鸟到弹弓 */
 function loadBird() {
-  if (G.birdsUsed >= G.birdsTotal) { G.state = 'idle'; return; }
-  const colorIdx = G.birdsUsed % 3;   // 红 → 黄 → 蓝 循环
-  const abilities = ['none', 'boost', 'split'];
+  if (G.birdIndex >= G.birdsTotal) { G.state = 'idle'; return; }
+  const color = G.birdQueue[G.birdIndex];
+  const ability = BIRD_ABILITY[color];
   const b = Bodies.circle(ANCHOR.x, ANCHOR.y + 14, 17, MAT_CONF.bird);
-  b.plugin = { kind: 'bird', color: colorIdx, ability: abilities[colorIdx], flashT: 0 };
+  b.plugin = { kind: 'bird', color, ability, flashT: 0 };
   G.bird = b;
-  G.abilities[b.id] = abilities[colorIdx];
+  G.abilities[b.id] = ability;
   G.trailOn[b.id] = true;
+  G.bombPlaced = false;
+  G.boomerangUsed = false;
   World.add(world, b);
   G.state = 'ready';
   G.inSlingshot = true;
@@ -459,11 +828,13 @@ function loadBird() {
 }
 
 function refreshQueue() {
-  const remain = G.birdsTotal - G.birdsUsed;
   queueDots.innerHTML = '';
   for (let i = 0; i < G.birdsTotal; i++) {
     const d = document.createElement('span');
-    d.className = 'queue-dot' + (i < G.birdsUsed ? ' gone' : '');
+    const color = G.birdQueue[i];
+    const hex = BIRD_COLOR_HEX[color] || '#e5301f';
+    d.className = 'queue-dot' + (i < G.birdIndex ? ' gone' : '');
+    d.style.background = `radial-gradient(circle at 34% 30%, ${lighten(hex,40)}, ${hex} 60%, ${hex})`;
     queueDots.appendChild(d);
   }
 }
@@ -530,7 +901,7 @@ function releaseBird() {
   const vx = -dragVec.x * LAUNCH_K;
   const vy = -dragVec.y * LAUNCH_K - 0.8;
   Body.setVelocity(G.bird, { x: vx, y: vy });
-  G.birdsUsed++;
+  G.birdIndex++;
   G.state = 'flying';
   G.inSlingshot = false;
   refreshQueue();
@@ -542,14 +913,14 @@ function releaseBird() {
 function tryAbility() {
   if (G.state !== 'flying' || !G.bird) return false;
   const ab = G.abilities[G.bird.id];
-  if (ab === 'boost') {              // 黄色小鸟：冲刺加速
+  if (ab === 'boost') {
     const v = G.bird.velocity;
     const sp = Math.hypot(v.x, v.y) || 1;
     Body.setVelocity(G.bird, { x: v.x / sp * 24, y: v.y / sp * 24 });
     sfx.ability();
     return true;
   }
-  if (ab === 'split') {              // 蓝色小鸟：分身三只
+  if (ab === 'split') {
     const b = G.bird;
     const ang = Math.atan2(b.velocity.y, b.velocity.x);
     const sp = Math.max(16, Math.hypot(b.velocity.x, b.velocity.y));
@@ -557,13 +928,44 @@ function tryAbility() {
       const s = Bodies.circle(b.position.x, b.position.y, 9, {
         density: 0.0018, friction: 0.5, frictionAir: 0.01, restitution: 0.35,
       });
-      s.plugin = { kind: 'fragment', color: 2, flashT: 0 };
+      s.plugin = { kind: 'fragment', color: 'blue', flashT: 0 };
       Body.setVelocity(s, { x: Math.cos(ang + off) * sp, y: Math.sin(ang + off) * sp });
       World.add(world, s);
       G.fragments.push(s);
     }
     World.remove(world, b);
     G.bird = null;
+    sfx.ability();
+    return true;
+  }
+  if (ab === 'bomb') {
+    // 黑鸟：以当前位置为圆心爆炸，炸飞附近所有物体（猪/积木/地面不炸）
+    detonate(G.bird.position.x, G.bird.position.y, 90, 14);
+    World.remove(world, G.bird);
+    G.bird = null;
+    sfx.ability();
+    return true;
+  }
+  if (ab === 'egg') {
+    // 白鸟：在当前位置下方丢一颗炸弹蛋
+    const bx = G.bird.position.x + G.bird.velocity.x * 0.3;
+    const by = G.bird.position.y + G.bird.velocity.y * 0.3 + 20;
+    const egg = Bodies.circle(bx, by, 7, { density: 0.002, friction: 0.5, frictionAir: 0.01, restitution: 0.3 });
+    egg.plugin = { kind: 'egg', flashT: 0 };
+    Body.setVelocity(egg, { x: G.bird.velocity.x * 0.6, y: G.bird.velocity.y * 0.6 + 5 });
+    World.add(world, egg);
+    G.fragments.push(egg);
+    sfx.ability();
+    return true;
+  }
+  if (ab === 'boomerang') {
+    // 绿鸟：反向飞行，速度加倍（每只鸟只能折返一次）
+    if (G.boomerangUsed) return false;
+    G.boomerangUsed = true;
+    Body.setVelocity(G.bird, {
+      x: -G.bird.velocity.x * 1.6,
+      y: -G.bird.velocity.y * 0.7 + 4,
+    });
     sfx.ability();
     return true;
   }
@@ -583,12 +985,25 @@ function pairSpeed(pair) {
   return Math.hypot(x, y);
 }
 
-function damagePig(pig, speed) {
+/* 判断是否击中了猪的头部（圆的上半部） */
+function isHeadHit(pigBody, otherBody) {
+  const py = pigBody.position.y;
+  const oy = otherBody.position.y;
+  // 如果撞击点位于猪圆心上方 40% 半径以上 → 头部
+  return oy < py - pigBody.circleRadius * 0.4;
+}
+
+function damagePig(pig, speed, fromBody) {
   if (G.removing[pig.id]) return;
-  if (speed < 3.0) return;                       // 撞击太轻不扣血
-  const dmg = speed * 1.8;
+  if (speed < 2.5) return;
+  let dmg = speed * 1.8;
+  // 头盔减伤：击中头部时生效
+  if (fromBody && isHeadHit(pig, fromBody) && pig.plugin.helmet > 0) {
+    dmg *= (1 - pig.plugin.helmet);
+    pig.plugin.helmetFlashT = 0.12;   // 头盔闪
+  }
   pig.plugin.hp -= dmg;
-  pig.plugin.flashT = 0.12;                      // 受击白闪
+  pig.plugin.flashT = 0.12;
   if (pig.plugin.hp <= 0) {
     destroyPig(pig);
   } else {
@@ -605,7 +1020,6 @@ function destroyPig(pig) {
   explode(pig.position.x, pig.position.y, '#7ed957', 14);
   sfx.pigDie();
   addShake(8);
-  refreshQueue();
   checkEnd();
 }
 
@@ -621,31 +1035,67 @@ function breakBlock(block) {
 
 function damageBlock(block, speed) {
   if (G.removing[block.id]) return;
-  if (speed < 2.8) return;
+  if (speed < 2.4) return;
   block.plugin.hp -= (speed > BREAK_FORCE[block.plugin.mat] ? 999 : 1);
   block.plugin.flashT = 0.12;
   if (block.plugin.hp <= 0) breakBlock(block);
   else sfx.blockHit();
 }
 
-/* 碰撞事件处理：小鸟/分身撞击猪或积木，建筑倒塌压猪等 */
+/* 爆炸：推开附近物体并造成伤害 */
+function detonate(x, y, radius, force) {
+  explode(x, y, '#ff8c00', 24);
+  addShake(14);
+  const bodies = Composite.allBodies(world);
+  for (const b of bodies) {
+    const k = b.plugin && b.plugin.kind;
+    if (!k || k === 'ground' || G.removing[b.id]) continue;
+    const dx = b.position.x - x, dy = b.position.y - y;
+    const dist = Math.hypot(dx, dy) || 0.5;
+    if (dist > radius) continue;
+    const power = (1 - dist / radius) * force;
+    // 推开
+    Body.setVelocity(b, {
+      x: b.velocity.x + (dx / dist) * power * 1.5,
+      y: b.velocity.y + (dy / dist) * power * 1.2 - power * 0.5,
+    });
+    // 伤害
+    if (k === 'pig') damagePig(b, power * 1.5, null);
+    if (k === 'block') damageBlock(b, power * 1.2);
+  }
+}
+
+/* 碰撞事件处理 */
 function onCollisionStart(ev) {
   for (const pair of ev.pairs) {
     const A = pair.bodyA, B = pair.bodyB;
     const ak = A.plugin && A.plugin.kind, bk = B.plugin && B.plugin.kind;
     const sp = pairSpeed(pair);
-    // 鸟类物体（主小鸟或分身）撞击
-    if ((ak === 'bird' || ak === 'fragment') && bk === 'pig') damagePig(B, sp);
-    if ((bk === 'bird' || bk === 'fragment') && ak === 'pig') damagePig(A, sp);
+
+    // 鸡蛋落地 → 爆炸
+    if (ak === 'egg' && bk === 'ground') { detonate(A.position.x, A.position.y, 60, 9); World.remove(world, A); }
+    if (bk === 'egg' && ak === 'ground') { detonate(B.position.x, B.position.y, 60, 9); World.remove(world, B); }
+    // 鸡蛋撞猪/积木 → 爆炸
+    if (ak === 'egg' && (bk === 'pig' || bk === 'block')) { detonate(A.position.x, A.position.y, 50, 8); World.remove(world, A); }
+    if (bk === 'egg' && (ak === 'pig' || ak === 'block')) { detonate(B.position.x, B.position.y, 50, 8); World.remove(world, B); }
+
+    // 鸟类撞击猪 → 正常伤害
+    if ((ak === 'bird' || ak === 'fragment') && bk === 'pig') damagePig(B, sp, A);
+    if ((bk === 'bird' || bk === 'fragment') && ak === 'pig') damagePig(A, sp, B);
+    // 撞击积木
     if ((ak === 'bird' || ak === 'fragment') && bk === 'block') damageBlock(B, sp);
     if ((bk === 'bird' || bk === 'fragment') && ak === 'block') damageBlock(A, sp);
-    // 建筑倒塌砸到小猪
-    if (ak === 'block' && bk === 'pig') damagePig(B, sp * 2.0);
-    if (bk === 'block' && ak === 'pig') damagePig(A, sp * 2.0);
-    if (ak === 'pig' && bk === 'pig') { damagePig(A, sp * 1.2); damagePig(B, sp * 1.2); }
-    // 小猪摔到地面
-    if (ak === 'pig' && bk === 'ground') damagePig(A, sp);
-    if (bk === 'pig' && ak === 'ground') damagePig(B, sp);
+    // 建筑倒塌压猪 → 高倍伤害
+    if (ak === 'block' && bk === 'pig') damagePig(B, sp * 2.5, A);
+    if (bk === 'block' && ak === 'pig') damagePig(A, sp * 2.5, B);
+    // 猪撞猪
+    if (ak === 'pig' && bk === 'pig') { damagePig(A, sp * 1.5, B); damagePig(B, sp * 1.5, A); }
+    // 猪摔到地面
+    if (ak === 'pig' && bk === 'ground') damagePig(A, sp * 1.8, null);
+    if (bk === 'pig' && ak === 'ground') damagePig(B, sp * 1.8, null);
+    // 积木砸到地面
+    if (ak === 'block' && bk === 'ground') damageBlock(A, sp * 1.3);
+    if (bk === 'block' && ak === 'ground') damageBlock(B, sp * 1.3);
   }
 }
 
@@ -687,7 +1137,7 @@ function updateTurn(dt) {
   if (G.turnTimer > 0) {
     G.turnTimer -= dt;
     if (G.turnTimer <= 0) {
-      if (G.birdsUsed < G.birdsTotal) loadBird();
+      if (G.birdIndex < G.birdsTotal) loadBird();
       else startLoseTimer();
     }
   }
@@ -745,7 +1195,7 @@ function updateLose(dt) {
 
 /* ---------------- 结算界面 ---------------- */
 function showWinScreen() {
-  const remain = G.birdsTotal - G.birdsUsed;
+  const remain = G.birdsTotal - G.birdIndex;
   const stars = remain >= 2 ? 3 : remain >= 1 ? 2 : 1;
   document.getElementById('winStars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
   document.getElementById('winText').textContent =
@@ -872,9 +1322,9 @@ function drawBody(b) {
 /* --- 小鸟 --- */
 function drawBird(b, x, y, a, flashing) {
   const r = b.circleRadius || 17;
-  const colors = ['#e5301f', '#ffc21a', '#3f9bff'];
-  const main = colors[b.plugin.color % colors.length];
-  ctx.scale(1, 0.92);   // 轻微压扁，卡通感
+  const color = b.plugin.color || 'red';
+  const main = BIRD_COLOR_HEX[color] || '#e5301f';
+  ctx.scale(1, 0.92);
 
   // 身体
   const grd = ctx.createRadialGradient(-r*0.35, -r*0.35, r*0.2, 0, 0, r);
@@ -888,6 +1338,12 @@ function drawBird(b, x, y, a, flashing) {
   ctx.fillStyle = 'rgba(255, 235, 200, 0.85)';
   ctx.beginPath(); ctx.ellipse(0, r*0.45, r*0.5, r*0.36, 0, 0, TAU); ctx.fill();
 
+  // 黑鸟独特花纹：肚皮更亮
+  if (color === 'black') {
+    ctx.fillStyle = 'rgba(200,190,180,0.7)';
+    ctx.beginPath(); ctx.ellipse(0, r*0.45, r*0.5, r*0.36, 0, 0, TAU); ctx.fill();
+  }
+
   // 眼睛
   ctx.fillStyle = '#fff';
   ctx.beginPath(); ctx.arc(r*0.28, -r*0.25, r*0.34, 0, TAU); ctx.fill();
@@ -896,7 +1352,7 @@ function drawBird(b, x, y, a, flashing) {
   ctx.fillStyle = '#fff';
   ctx.beginPath(); ctx.arc(r*0.45, -r*0.34, r*0.06, 0, TAU); ctx.fill();
 
-  // 眉毛（愤怒！）
+  // 眉毛
   ctx.strokeStyle = '#3a1610'; ctx.lineWidth = r*0.16; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(r*0.12, -r*0.52); ctx.lineTo(r*0.48, -r*0.38); ctx.stroke();
 
@@ -907,7 +1363,7 @@ function drawBird(b, x, y, a, flashing) {
   ctx.quadraticCurveTo(r*0.55, r*0.12, r*0.55, -0.02);
   ctx.fill();
 
-  // 头顶羽毛（鸟冠）
+  // 头顶羽毛
   ctx.fillStyle = main;
   ctx.beginPath(); ctx.moveTo(-r*0.1, -r*0.8);
   ctx.quadraticCurveTo(-r*0.3, -r*1.35, -r*0.02, -r*1.25);
@@ -925,18 +1381,48 @@ function drawBird(b, x, y, a, flashing) {
 /* --- 小猪 --- */
 function drawPig(b, x, y, a, flashing) {
   const r = 17;
+  const pt = b.plugin.pigType || 'normal';
   ctx.scale(1, 0.9);
+
+  // 身体 (armored 猪颜色略深)
+  const bodyTop = pt === 'armored' ? '#8cd46c' : '#9be97a';
+  const bodyBot = pt === 'armored' ? '#4ea02c' : '#5ec232';
   const grd = ctx.createRadialGradient(-r*0.3, -r*0.3, r*0.2, 0, 0, r);
-  grd.addColorStop(0, '#9be97a');
-  grd.addColorStop(1, '#5ec232');
+  grd.addColorStop(0, bodyTop);
+  grd.addColorStop(1, bodyBot);
   ctx.fillStyle = grd;
   ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
   ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.stroke();
 
   // 耳朵
-  ctx.fillStyle = '#6fbf3e';
+  ctx.fillStyle = pt === 'armored' ? '#4ea02c' : '#6fbf3e';
   ctx.beginPath(); ctx.arc(-r*0.6, -r*0.7, r*0.28, 0, TAU); ctx.fill();
   ctx.beginPath(); ctx.arc(r*0.6, -r*0.7, r*0.28, 0, TAU); ctx.fill();
+
+  // 头盔绘制
+  if (pt !== 'normal') {
+    const helmFlash = b.plugin.helmetFlashT > 0;
+    if (helmFlash) b.plugin.helmetFlashT -= 1/60;
+    const helmColor = pt === 'armored' ? '#7a8590' : '#c9a05a';
+    const hlColor = pt === 'armored' ? '#9ea8b3' : '#e0c080';
+    ctx.fillStyle = helmFlash ? '#fff' : helmColor;
+    // 头盔体
+    ctx.beginPath(); ctx.arc(0, -r*0.15, r*0.85, Math.PI, 0);
+    ctx.arc(0,  r*0.15, r*0.85, 0, Math.PI, true);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = helmFlash ? '#fff' : hlColor;
+    ctx.lineWidth = 2.5; ctx.stroke();
+    // 盔沿
+    ctx.fillStyle = helmFlash ? '#fff' : hlColor;
+    ctx.fillRect(-r*0.78, -r*0.28, r*1.56, 5);
+    // 铁盔铆钉
+    if (pt === 'armored') {
+      ctx.fillStyle = '#ddd';
+      for (const ox of [-r*0.45, 0, r*0.45]) {
+        ctx.beginPath(); ctx.arc(ox, -r*0.25, 2.5, 0, TAU); ctx.fill();
+      }
+    }
+  }
 
   // 眼睛
   ctx.fillStyle = '#fff';
@@ -947,7 +1433,7 @@ function drawPig(b, x, y, a, flashing) {
   ctx.beginPath(); ctx.arc(r*0.46, -r*0.2, r*0.13, 0, TAU); ctx.fill();
 
   // 鼻子
-  ctx.fillStyle = '#4ea02c';
+  ctx.fillStyle = pt === 'armored' ? '#3c7f22' : '#4ea02c';
   ctx.beginPath(); ctx.ellipse(0, r*0.28, r*0.4, r*0.3, 0, 0, TAU); ctx.fill();
   ctx.fillStyle = '#3c7f22';
   ctx.beginPath(); ctx.arc(-r*0.15, r*0.28, r*0.07, 0, TAU); ctx.fill();
